@@ -7,7 +7,6 @@ load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 ORG_ID = os.environ.get('organizationId')
 NETWORKS = [os.environ.get('networks')]
-#NETWORKS = ['L_634444597505836881']
 ms_firmware_level = 'switch-15-21-1'
 
 # Initialize the Meraki API client
