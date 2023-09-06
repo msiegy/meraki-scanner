@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 - Pull down Running Meraki Device Firmware information for all devices in a given Organization ID from the Meraki Cloud API.
 - Pull down Vulnerability CVEs for Meraki platforms from the OpenVulnAPI
 - [TODO] Check network devices for required security configuration
+- [TODO] Compile Data for routine batch Kenna Upload
 """
 
 # Set your API key and organization ID
