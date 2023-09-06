@@ -5,6 +5,12 @@ from colorama import Fore, Back, Style
 from pprint import pprint 
 from dotenv import load_dotenv
 
+"""
+- Pull down Running Meraki Device Firmware information for all devices in a given Organization ID from the Meraki Cloud API.
+- Pull down Vulnerability CVEs for Meraki platforms from the OpenVulnAPI
+- [TODO] Check network devices for required security configuration
+"""
+
 # Set your API key and organization ID
 load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
