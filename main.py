@@ -1,5 +1,8 @@
 import meraki
 import os
+import requests
+from colorama import Fore, Back, Style
+from pprint import pprint 
 from dotenv import load_dotenv
 
 # Set your API key and organization ID
@@ -7,14 +10,21 @@ load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 ORG_ID = os.environ.get('organizationId')
 NETWORKS = [os.environ.get('networks')]
+VULNCLIENTID = [os.environ.get('openvulnCLIENT_ID')]
+VULNSECRET = [os.environ.get('openvulnCLIENT_SECRET')]
 ms_firmware_level = 'switch-15-21-1'
+
+#resourceIDs=204722 (MS), 204723 (MR), 204724 (MX)
+MSfamily = "Cisco%20Meraki%20MS%20Firmware"
+MRfamily = "Cisco%20Meraki%20MR%20Firmware"
+MXfamily = "Cisco%20Meraki%20MX%20Firmware"
 
 # Initialize the Meraki API client
 dashboard = meraki.DashboardAPI(API_KEY)
 
 def get_firmware_versions():
     # Get all devices in the organization
-    networks = dashboard.organizations.getOrganizationNetworks(ORG_ID)
+    networks = dashboard.organizations.getOrganizationNetworks(ORG_ID)  #not used for testing, change loop reference below to leverage.
 
     firmware_versions = {}
         
@@ -27,6 +37,7 @@ def get_firmware_versions():
             version = firmware['products']['switch']['currentVersion']['firmware']
             firmware_versions[network] = version
 
+    print("\n\n Raw Firmware Versions\n",firmware_versions,"\n\n")
     return firmware_versions
 
 def get_switch_ports():
@@ -53,7 +64,24 @@ def check_firmware_versions():
         if version != ms_firmware_level:
             print(f"Network {network} has firmware version {version}, which is not equal to desired version {ms_firmware_level}.")
         else:
-            print(f"Network {network} meets requirements with firmware version {version}")                  
+            print(f"Network {network} meets requirements with firmware version {version}")
+
+def get_firmware_by_device():
+    firmwarebydevice = []
+
+    response = dashboard.organizations.getOrganizationFirmwareUpgradesByDevice(ORG_ID, total_pages='all')
+    for device in response:
+        if device['deviceStatus'] == "Completed":   #skip entries for "started"
+            serial = device['serial']
+            deviceinfo = dashboard.devices.getDevice(serial)
+            #print(deviceinfo['firmware'], '  ', device['upgrade']['toVersion']['shortName'])
+            firmwarebydevice.append({'serial': device['serial'], 
+                                    'hostname': device['name'],
+                                    'firmware': device['upgrade']['toVersion']['shortName'],
+                                    'ipAddress': deviceinfo['lanIp'],
+                                    'model': deviceinfo['model']
+                                    })
+    return firmwarebydevice
                   
 def check_switch_port_config():
     switch_ports = get_switch_ports()
@@ -63,9 +91,39 @@ def check_switch_port_config():
             if port['accessPolicyType'] != 'closed':
                 print(f"Port {port['portId']} on device with serial {serial} is not configured with accessPolicyType = closed.")
 
-# Run the checks
-check_firmware_versions()
-#check_switch_port_config()
+def get_vuln_auth_token():
+    url="https://id.cisco.com/oauth2/default/v1/token"
+    data = {
+        'grant_type': 'client_credentials',
+        'client_secret': VULNSECRET,
+        'client_id': VULNCLIENTID
+    }
+    response=requests.post(url, data=data).json()
+    token_string=response['access_token']
 
-#import ipdb
-#ipdb.set_trace() 
+    return token_string
+    
+def check_open_vulns(productfamily):
+    token = get_vuln_auth_token()
+    headers = {"Authorization": "Bearer " + token}
+    response = requests.get('https://apix.cisco.com/security/advisories/v2/product?product='+productfamily, headers=headers)
+
+    response = response.json()
+
+    #breakpoint()
+    #import ipdb; ipdb.set_trace()
+    return response
+ 
+
+# Run the checks
+#check_firmware_versions()
+firmwaredata= get_firmware_by_device()
+vulnerabilities = check_open_vulns(MSfamily)
+
+print(Fore.GREEN, "#######- MERAKI RUNNING FIRMWARE INFORMATION -#######\n")
+pprint(firmwaredata)
+input() #wait for user input to continue, for demo.
+print(Fore.RED, "\n\n#######- MERAKI VULNERABILITY INFORMATION -#######\n")
+pprint(vulnerabilities)
+
+#check_switch_port_config()
