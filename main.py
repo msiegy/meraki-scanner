@@ -131,6 +131,11 @@ print(Fore.GREEN, "#######- MERAKI RUNNING FIRMWARE INFORMATION -#######\n")
 pprint(firmwaredata)
 input() #wait for user input to continue, for demo.
 print(Fore.RED, "\n\n#######- MERAKI VULNERABILITY INFORMATION -#######\n")
-pprint(vulnerabilities)
+print("OpenVuln API returned", len(vulnerabilities['advisories']), "vulnerabilities to investigate:")
+for advisory in vulnerabilities['advisories']:
+    print(" ", advisory['advisoryId'])
+input() #wait for user input to continue, for demo.
 
+pprint(vulnerabilities)
+import ipdb; ipdb.set_trace()
 #check_switch_port_config()
