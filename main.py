@@ -38,6 +38,7 @@ def get_firmware_versions():
     # Iterate over each network (by device would be messy)
     for network in NETWORKS:
         firmware = dashboard.networks.getNetworkFirmwareUpgrades(network)
+        #import ipdb; ipdb.set_trace()
 
         # Check if firmware information is available, then store firmware version in dictionary by network key
         if 'products' in firmware:
@@ -77,17 +78,19 @@ def get_firmware_by_device():
     firmwarebydevice = []
 
     response = dashboard.organizations.getOrganizationFirmwareUpgradesByDevice(ORG_ID, total_pages='all')
+
     for device in response:
         if device['deviceStatus'] == "Completed":   #skip entries for "started"
             serial = device['serial']
             deviceinfo = dashboard.devices.getDevice(serial)
             #print(deviceinfo['firmware'], '  ', device['upgrade']['toVersion']['shortName'])
-            firmwarebydevice.append({'serial': device['serial'], 
+            firmwarebydevice.append({'serial': device['serial'],
                                     'hostname': device['name'],
                                     'firmware': device['upgrade']['toVersion']['shortName'],
                                     'ipAddress': deviceinfo['lanIp'],
                                     'model': deviceinfo['model']
                                     })
+    
     return firmwarebydevice
                   
 def check_switch_port_config():
@@ -116,14 +119,13 @@ def check_open_vulns(productfamily):
     response = requests.get('https://apix.cisco.com/security/advisories/v2/product?product='+productfamily, headers=headers)
 
     response = response.json()
-
-    #breakpoint()
-    #import ipdb; ipdb.set_trace()
     return response
  
 
 # Run the checks
 #check_firmware_versions()
+#get_firmware_versions()
+
 firmwaredata= get_firmware_by_device()
 vulnerabilities = check_open_vulns(MSfamily)
 
@@ -137,5 +139,5 @@ for advisory in vulnerabilities['advisories']:
 input() #wait for user input to continue, for demo.
 
 pprint(vulnerabilities)
-import ipdb; ipdb.set_trace()
+#import ipdb; ipdb.set_trace()
 #check_switch_port_config()
