@@ -91,30 +91,35 @@ def get_latest_firmware_info(network_id, product_families, desired_release_type)
 # Function to get the currently running firmware versions for devices of the defined product families
 def get_current_firmware_versions(org_id, product_families):
     device_info = {}
+    seen_serials = set()
     
     try:
         # Fetch firmware upgrade information by device in the organization
-        devices = dashboard.organizations.getOrganizationFirmwareUpgradesByDevice(org_id)
+        devices = dashboard.organizations.getOrganizationFirmwareUpgradesByDevice(org_id, upgradeStatuses='Completed')
+        
+        # Sort devices by timestamp in descending order to get the latest upgrades first
+        devices.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
         
         # Loop through devices to store current firmware shortName and model type, filtering by product family
         for device in devices:
             serial = device.get('serial', 'N/A')
-            #model = get_model_by_serial(serial).lower()
-        
+            
+            # Skip if we've already processed this serial
+            if serial in seen_serials:
+                continue
+            
+            seen_serials.add(serial)
+            
             deviceinfo = dashboard.devices.getDevice(serial)
             model = deviceinfo['model']
-            #model = get_model_by_serial(serial)
             ipAddress = deviceinfo['lanIp']
             hostname = deviceinfo['name']
-            
-            #to_version = device.get('toVersion', {})
             short_name = device.get('upgrade').get('toVersion').get('shortName', 'N/A')
             
             # Map models to product families based on user-defined product families
-            #if any(product_family in model for product_family in product_families):
-            #    product_family = next((family for family in product_families if family in model), 'N/A')
             product_family = get_product_family(model)
-                # Store the device's current firmware info if it matches the product family
+            
+            # Store the device's current firmware info if it matches the product family
             device_info[serial] = {
                 'model': model,
                 'running_firmware': short_name,  # Using the shortName from toVersion
@@ -123,12 +128,12 @@ def get_current_firmware_versions(org_id, product_families):
                 'hostname': hostname
             }
             
-            
     except Exception as e:
         # Handle any exceptions
         device_info['error'] = str(e)
     
     return device_info
+
 
 # Function to merge and compare current vs latest firmware versions
 def compare_firmware_versions(network_ids, org_id, product_families, desired_release_type):
