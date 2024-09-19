@@ -1,8 +1,8 @@
 import meraki
 import os
 import json
-from colorama import Fore, Back, Style
-from pprint import pprint
+#from colorama import Fore, Back, Style
+#from pprint import pprint
 from dotenv import load_dotenv
 
 """
