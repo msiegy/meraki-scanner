@@ -6,6 +6,14 @@ import json
 from dotenv import load_dotenv
 
 """
+INSTALL:
+- git clone https://github.com/msiegy/meraki-scanner.git && cd meraki-scanner
+- python -m venv venv && source venv/bin/activate
+- pip install requirements.txt
+- Update MerakiAPIKey in .env file and update org_id and network_ids values below.
+- Run compare_firmware.py
+
+SCRIPT:
 - Pull down Running Meraki Device Firmware information for all devices in a given Organization ID from the Meraki Cloud API.
 - Pull down latest available versions for provided product families.
 - Compare Running Firmware against Latest available and Compile JSON Data for routine batch Kenna Upload
