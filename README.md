@@ -42,7 +42,7 @@ This script will pull inventory data and current running versions and compare ag
 
 
 
-#### Main.py Demo
+#### CVE-poc.py Demo
    Configure ENV values for your Meraki dashboard and run python main.py
    <br>The script will pull down firmware data for every device in the organization provided. Then all Meraki vulnerabilities, regardless of exposure are pulled down using Cisco's OpenVuln API.
     
