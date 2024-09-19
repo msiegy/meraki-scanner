@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 INSTALL:
 - git clone https://github.com/msiegy/meraki-scanner.git && cd meraki-scanner
 - python -m venv venv && source venv/bin/activate
-- pip install requirements.txt
+- pip install -r requirements.txt
 - Update MerakiAPIKey in .env file and update org_id and network_ids values below.
 - Run compare_firmware.py
 
