@@ -45,7 +45,7 @@ def get_product_family(device_model):
     # Return the corresponding product family or 'unknown' if not found
     return next((family for prefix, family in prefix_map.items() if device_model.startswith(prefix)), 'unknown')
 
-# Function to get firmware details for a given network ID and product family
+# Function to get the latest available firmware version and details for a given network ID and product family
 def get_latest_firmware_info(network_id, product_families, desired_release_type):
     firmware_info = {}
     
@@ -58,11 +58,11 @@ def get_latest_firmware_info(network_id, product_families, desired_release_type)
             available_versions = firmware_upgrades.get('products', {}).get(product_family, {}).get('availableVersions', [])
             
             # Filter versions based on the desired release type
-            stable_versions = [version for version in available_versions if version.get('releaseType') == desired_release_type]
+            desired_versions = [version for version in available_versions if version.get('releaseType') == desired_release_type]
             
             # If versions exist for the desired release type, fetch the latest one
-            if stable_versions:
-                latest_version = stable_versions[-1]  # Assuming the last one is the latest
+            if desired_versions:
+                latest_version = desired_versions[-1]  # Assuming the last one is the latest
                 short_name = latest_version.get('shortName', 'N/A')
                 release_date = latest_version.get('releaseDate', 'N/A')
                 
