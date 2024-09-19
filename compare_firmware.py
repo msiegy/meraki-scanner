@@ -166,7 +166,7 @@ def compare_firmware_versions(network_ids, org_id, product_families, desired_rel
                 'ipAddress': device_info.get('ipAddress', 'N/A'),
                 'model': device_info.get('model', 'N/A'),
                 'running_firmware': device_info.get('running_firmware', 'N/A'),
-                'running_release_type': device_info.get('release_type', 'N/A'),
+                #'running_release_type': device_info.get('release_type', 'N/A'),
                 'latest_firmware': latest_version,
                 'desired_release_type': latest_firmware.get('release_type', 'N/A'),
                 'up_to_date': device_info.get('running_firmware', '').endswith(latest_version)  # Compare the end part of the running firmware with the latest shortName
