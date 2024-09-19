@@ -1,19 +1,9 @@
 import meraki
 import os
 import json
-#from colorama import Fore, Back, Style
-#from pprint import pprint
 from dotenv import load_dotenv
 
 """
-INSTALL:
-- git clone https://github.com/msiegy/meraki-scanner.git && cd meraki-scanner
-- python -m venv venv && source venv/bin/activate
-- pip install -r requirements.txt
-- Update MerakiAPIKey in .env file and update org_id and network_ids values below.
-- Run compare_firmware.py
-
-SCRIPT:
 - Pull down Running Meraki Device Firmware information for all devices in a given Organization ID from the Meraki Cloud API.
 - Pull down latest available versions for provided product families.
 - Compare Running Firmware against Latest available and Compile JSON Data for routine batch Kenna Upload
@@ -26,13 +16,22 @@ load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 
 # User-defined network IDs, product families, and desired release type
-org_id = 'your_organization_id'  # Replace with your actual organization ID
-network_ids = ['your_network_IDs']  # Replace with actual network IDs
+org_id = 'your_org_id'  # Replace with your actual organization ID
+network_ids = ['your_network_id']  # Replace with actual network IDs
 product_families = ['switch', 'switchCatalyst']
-desired_release_type = 'candidate'  # User-defined release type (e.g., 'stable', 'candidate', beta, etc)
+desired_release_type = 'stable' # User-defined release type (e.g., 'stable', 'candidate', beta, etc)
 
 # Instantiate the Meraki dashboard API
 dashboard = meraki.DashboardAPI(API_KEY)
+
+# Function to compare versions and handle varying naming schemes. If running version is greater or equal to latest, return True
+def compare_versions(running_firmware, latest_version):
+    # Extract numeric parts of the version (ignoring the prefix like 'MS')
+    running_version_parts = [int(part) for part in running_firmware.split()[-1].split('.') if part.isdigit()]
+    latest_version_parts = [int(part) for part in latest_version.split()[-1].split('.') if part.isdigit()]
+
+    # Compare the version parts; return True if running version is greater or equal, it's considered up to date
+    return running_version_parts >= latest_version_parts
 
 def get_product_family(device_model):
     # Dictionary mapping model prefixes to product families
@@ -97,7 +96,7 @@ def get_current_firmware_versions(org_id, product_families):
         # Fetch firmware upgrade information by device in the organization
         devices = dashboard.organizations.getOrganizationFirmwareUpgradesByDevice(org_id, upgradeStatuses='Completed')
         
-        # Sort devices by timestamp in descending order to get the latest upgrades first
+        # Sort devices by timestamp in descending order to get the latest upgrades first, if timestamp missing then default to '' string
         devices.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
         
         # Loop through devices to store current firmware shortName and model type, filtering by product family
@@ -134,7 +133,6 @@ def get_current_firmware_versions(org_id, product_families):
     
     return device_info
 
-
 # Function to merge and compare current vs latest firmware versions
 def compare_firmware_versions(network_ids, org_id, product_families, desired_release_type):
     comparison_results = {}
@@ -169,7 +167,7 @@ def compare_firmware_versions(network_ids, org_id, product_families, desired_rel
                 #'running_release_type': device_info.get('release_type', 'N/A'),
                 'latest_firmware': latest_version,
                 'desired_release_type': latest_firmware.get('release_type', 'N/A'),
-                'up_to_date': device_info.get('running_firmware', '').endswith(latest_version)  # Compare the end part of the running firmware with the latest shortName
+                'up_to_date': compare_versions(device_info.get('running_firmware', 'N/A'), latest_version) # Compare the running firmware with the latest shortName, return true if greater or equal.
             }
     
     # Output the results as JSON
