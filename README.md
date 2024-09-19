@@ -2,6 +2,7 @@
 Simple Proof of Concept exploring the available Meraki Dashboard APIs at https://developer.cisco.com/meraki/api/overview/ to pull down software versions and other information for the purpose of vulnerability management.
 
 #### compare_firmware.py Example Output
+This script will pull inventory data and current running versions and compare against the latest available versions of the desired release type.
 ```
 {
     "L_3xxxxxxxx": {
