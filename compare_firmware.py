@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 - Pull down Running Meraki Device Firmware information for all devices in multiple Organization IDs using getOrganizationFirmwareUpgradesByDevice.
 - Pull down latest available versions for provided product families, using getNetworkFirmwareUpgrades on a network containing relevant devices.
 - Compare Running Firmware against Latest available and Compile JSON Data for routine batch Kenna Upload
+- [TODO] Add logic to allow exluding specific network_IDs. e.g.: Labs, etc.
 - [TODO] Pull down Vulnerability CVEs for Meraki platforms from the OpenVulnAPI
 - [TODO] Check network devices for required security configuration
 """
@@ -16,8 +17,8 @@ load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 
 # User-defined organization IDs, network IDs, product families, and desired release type
-org_ids = ['your_org_ID'] # Replace with your actual organization ID
-network_id = ['your_network_ID'] # Replace with actual network ID. Only a single ID is needed to fetch latest firmware versions available.  
+org_ids = ['your_org_id'] # Replace with your actual organization ID
+network_id = 'your_network_id' # Replace with actual network ID. Only used to fetch latest firmware versions available.  
 product_families = ['switch', 'switchCatalyst']
 desired_release_type = 'stable'  # User-defined release type (e.g., 'stable', 'candidate', beta, etc.)
 
@@ -83,6 +84,10 @@ def get_latest_firmware_info(network_id, product_families, desired_release_type)
     
     except Exception as e:
         # Handle any exception and store the error message
+        if '404' in str(e):
+         print(f"ERROR: 404 Not Found. Please ensure the network ID '{network_id}' is correct and contains devices of the specified product families.")
+        else:
+            print(f"ERROR: {e}")
         firmware_info['error'] = str(e)
     
     return firmware_info
@@ -140,10 +145,9 @@ def compare_firmware_versions(network_id, org_ids, product_families, desired_rel
     # Loop over each organization ID
     for org_id in org_ids:
         comparison_results[org_id] = {}
-        
-        for network_id in network_id:
-            # Get latest firmware info for product families
-            latest_firmware_info = get_latest_firmware_info(network_id, product_families, desired_release_type)
+                
+        # Get latest firmware available for product families
+        latest_firmware_info = get_latest_firmware_info(network_id, product_families, desired_release_type)
             
         # Get current firmware running on devices, filtered by product families
         current_firmware_info = get_current_firmware_versions(org_id, product_families)
