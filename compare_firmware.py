@@ -11,13 +11,12 @@ INSTALL:
 - Configure MerakiAPIKey ENV variable and update org_id and network_id values below.
 - Run compare_firmware.py
 
-SCRIPT:
+"""
 - Pull down Running Meraki Device Firmware information for all devices in multiple Organization IDs using getOrganizationFirmwareUpgradesByDevice.
 - Pull down latest available versions for provided product families, using getNetworkFirmwareUpgrades on a network containing relevant devices.
 - Compare Running Firmware against Latest available and Compile JSON Data for routine batch Kenna Upload
 - [TODO] Add logic to allow exluding specific network_IDs. e.g.: Labs, etc.
-- [TODO] Pull down Vulnerability CVEs for Meraki platforms from the OpenVulnAPI
-- [TODO] Check network devices for required security configuration
+- [TODO] Handle large Org firmware datasets with pagination
 """
 
 # Set your API key from secrets
@@ -25,8 +24,8 @@ load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 
 # User-defined organization IDs, network IDs, product families, and desired release type
-org_ids = ['your_org_id'] # Replace with your actual organization ID
-network_id = 'your_network_id' # Replace with actual network ID. Only used to fetch latest firmware versions available.  
+org_ids = ['your_org_id'] # Replace with your actual organization ID   
+network_id = 'your_network_id'  # Replace with actual network ID. Only used to fetch latest firmware versions available.  
 product_families = ['switch', 'switchCatalyst']
 desired_release_type = 'stable'  # User-defined release type (e.g., 'stable', 'candidate', beta, etc.)
 
@@ -35,7 +34,10 @@ dashboard = meraki.DashboardAPI(API_KEY)
 
 # Function to compare versions and handle varying naming schemes. If running version is greater or equal to latest, return True
 def compare_versions(running_firmware, latest_version):
-    # Extract numeric parts of the version (ignoring the prefix like 'MS')
+    """
+    Compare versions and handle varying naming schemes. If running version is greater or equal to latest, return True.
+    """
+
     running_version_parts = [int(part) for part in running_firmware.split()[-1].split('.') if part.isdigit()]
     latest_version_parts = [int(part) for part in latest_version.split()[-1].split('.') if part.isdigit()]
 
@@ -54,8 +56,11 @@ def get_product_family(device_model):
     # Return the corresponding product family or 'unknown' if not found
     return next((family for prefix, family in prefix_map.items() if device_model.startswith(prefix)), 'unknown')
 
-# Function to get the latest available firmware version and details for a given network ID and product family
+
 def get_latest_firmware_info(network_id, product_families, desired_release_type):
+    """
+    Get the latest available firmware version and details for a given network ID and product family.
+    """
     firmware_info = {}
     
     try:
@@ -100,8 +105,10 @@ def get_latest_firmware_info(network_id, product_families, desired_release_type)
     
     return firmware_info
 
-# Function to get the currently running firmware versions for devices of the defined product families
 def get_current_firmware_versions(org_id, product_families):
+    """
+    Get the currently running firmware versions for devices from the provided Organization ID.
+    """
     device_info = {}
     seen_serials = set()
     
@@ -116,7 +123,7 @@ def get_current_firmware_versions(org_id, product_families):
         for device in devices:
             serial = device.get('serial', 'N/A')
             
-            # Skip if we've already processed this serial. We do this because getOrganizationFirmwareUpgradesByDevice returns multiple entries per device serial.
+            # Skip if we've already processed this serial. We do this because getOrganizationFirmwareUpgradesByDevice returns multiple entries per device serial. It ensures we only process each serial once and do not overwrite device_info with old information.
             if serial in seen_serials:
                 continue
             
@@ -127,6 +134,9 @@ def get_current_firmware_versions(org_id, product_families):
             ipAddress = deviceinfo['lanIp']
             hostname = deviceinfo['name']
             short_name = device.get('upgrade').get('toVersion').get('shortName', 'N/A')
+            details = deviceinfo.get('details', '')
+            tags = deviceinfo.get('tags', '')
+            devicenetwork_id = deviceinfo.get('networkId', '')
             
             # Map models to product families based on user-defined product families
             product_family = get_product_family(model)
@@ -137,7 +147,10 @@ def get_current_firmware_versions(org_id, product_families):
                 'running_firmware': short_name,  # Using the shortName from toVersion
                 'product_family': product_family,
                 'ipAddress': ipAddress,
-                'hostname': hostname
+                'hostname': hostname,
+                'details': details,
+                'tags': tags,
+                'network_id': devicenetwork_id
             }
             
     except Exception as e:
@@ -146,12 +159,15 @@ def get_current_firmware_versions(org_id, product_families):
     
     return device_info
 
-# Function to merge and compare current vs latest firmware versions
 def compare_firmware_versions(network_id, org_ids, product_families, desired_release_type):
+    """
+    Merge and compare the current runing firmware versions with the latest available firmware versions for the specified product families.
+    """
     comparison_results = {}
     
     # Loop over each organization ID
     for org_id in org_ids:
+        #comparison_results.setdefault(org_id, {}) #create entries as new networkIDs are found.
         comparison_results[org_id] = {}
                 
         # Get latest firmware available for product families
@@ -160,9 +176,7 @@ def compare_firmware_versions(network_id, org_ids, product_families, desired_rel
         # Get current firmware running on devices, filtered by product families
         current_firmware_info = get_current_firmware_versions(org_id, product_families)
         
-        # Compare the two and store results
-        comparison_results[org_id][network_id] = {}
-        
+        # Compare the two and store results      
         for serial, device_info in current_firmware_info.items():
             # Ensure device_info is a dictionary (skip errors if any)
             if not isinstance(device_info, dict):
@@ -174,11 +188,16 @@ def compare_firmware_versions(network_id, org_ids, product_families, desired_rel
             latest_firmware = latest_firmware_info.get(product_family, {})
             latest_version = latest_firmware.get('latest_short_name', 'N/A')
             
-            # Compare current firmware shortName (from the running version) with the latest version available
-            comparison_results[org_id][network_id][serial] = {
+            devicesnetwork_id = device_info.get('network_id', 'N/A')
+            comparison_results[org_id].setdefault(devicesnetwork_id, {}) #create entries as new networkIDs are found, so device info is correctly allocated.
+            
+            # Compare current firmware shortName (from the running version) with the latest version available            
+            comparison_results[org_id][devicesnetwork_id][serial] = {
                 'hostname': device_info.get('hostname', 'N/A'),
                 'ipAddress': device_info.get('ipAddress', 'N/A'),
                 'model': device_info.get('model', 'N/A'),
+                'details': device_info.get('details', ''),
+                'tags': device_info.get('tags', ''),
                 'running_firmware': device_info.get('running_firmware', 'N/A'),
                 'latest_firmware': latest_version,
                 'desired_release_type': latest_firmware.get('release_type', 'N/A'),
@@ -190,3 +209,4 @@ def compare_firmware_versions(network_id, org_ids, product_families, desired_rel
 
 # Call the function and print the comparison results for multiple org_ids
 print(compare_firmware_versions(network_id, org_ids, product_families, desired_release_type))
+
