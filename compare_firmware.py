@@ -4,8 +4,8 @@ import json
 from dotenv import load_dotenv
 
 """
-- Pull down Running Meraki Device Firmware information for all devices in a given Organization ID from the Meraki Cloud API.
-- Pull down latest available versions for provided product families.
+- Pull down Running Meraki Device Firmware information for all devices in multiple Organization IDs using getOrganizationFirmwareUpgradesByDevice.
+- Pull down latest available versions for provided product families, using getNetworkFirmwareUpgrades on a network containing relevant devices.
 - Compare Running Firmware against Latest available and Compile JSON Data for routine batch Kenna Upload
 - [TODO] Pull down Vulnerability CVEs for Meraki platforms from the OpenVulnAPI
 - [TODO] Check network devices for required security configuration
@@ -15,11 +15,11 @@ from dotenv import load_dotenv
 load_dotenv()
 API_KEY = os.environ.get('MerakiAPIKey')
 
-# User-defined network IDs, product families, and desired release type
-org_id = 'your_org_id'  # Replace with your actual organization ID
-network_ids = ['your_network_id']  # Replace with actual network IDs
+# User-defined organization IDs, network IDs, product families, and desired release type
+org_ids = ['your_org_ID'] # Replace with your actual organization ID
+network_id = ['your_network_ID'] # Replace with actual network ID. Only a single ID is needed to fetch latest firmware versions available.  
 product_families = ['switch', 'switchCatalyst']
-desired_release_type = 'stable' # User-defined release type (e.g., 'stable', 'candidate', beta, etc)
+desired_release_type = 'stable'  # User-defined release type (e.g., 'stable', 'candidate', beta, etc.)
 
 # Instantiate the Meraki dashboard API
 dashboard = meraki.DashboardAPI(API_KEY)
@@ -34,7 +34,7 @@ def compare_versions(running_firmware, latest_version):
     return running_version_parts >= latest_version_parts
 
 def get_product_family(device_model):
-    # Dictionary mapping model prefixes to product families
+    # Dictionary mapping model prefixes to product families. Used to pull latest firmware available for the appropriate product family. e.g.: MS390 will consider 'switch' product family releases.
     prefix_map = {
         'MS': 'switch',
         'C9': 'switchCatalyst',
@@ -103,7 +103,7 @@ def get_current_firmware_versions(org_id, product_families):
         for device in devices:
             serial = device.get('serial', 'N/A')
             
-            # Skip if we've already processed this serial
+            # Skip if we've already processed this serial. We do this because getOrganizationFirmwareUpgradesByDevice returns multiple entries per device serial.
             if serial in seen_serials:
                 continue
             
@@ -134,18 +134,22 @@ def get_current_firmware_versions(org_id, product_families):
     return device_info
 
 # Function to merge and compare current vs latest firmware versions
-def compare_firmware_versions(network_ids, org_id, product_families, desired_release_type):
+def compare_firmware_versions(network_id, org_ids, product_families, desired_release_type):
     comparison_results = {}
     
-    for network_id in network_ids:
-        # Get latest firmware info for product families
-        latest_firmware_info = get_latest_firmware_info(network_id, product_families, desired_release_type)
+    # Loop over each organization ID
+    for org_id in org_ids:
+        comparison_results[org_id] = {}
         
+        for network_id in network_id:
+            # Get latest firmware info for product families
+            latest_firmware_info = get_latest_firmware_info(network_id, product_families, desired_release_type)
+            
         # Get current firmware running on devices, filtered by product families
         current_firmware_info = get_current_firmware_versions(org_id, product_families)
         
         # Compare the two and store results
-        comparison_results[network_id] = {}
+        comparison_results[org_id][network_id] = {}
         
         for serial, device_info in current_firmware_info.items():
             # Ensure device_info is a dictionary (skip errors if any)
@@ -154,17 +158,16 @@ def compare_firmware_versions(network_ids, org_id, product_families, desired_rel
 
             product_family = device_info.get('product_family', 'unknown')
             
-            # Get the latest firmware for the product family
+            # Get the latest firmware for the product family. Family is derived from the device's model prefix based on mapping defined above.
             latest_firmware = latest_firmware_info.get(product_family, {})
             latest_version = latest_firmware.get('latest_short_name', 'N/A')
             
             # Compare current firmware shortName (from the running version) with the latest version available
-            comparison_results[network_id][serial] = {
+            comparison_results[org_id][network_id][serial] = {
                 'hostname': device_info.get('hostname', 'N/A'),
                 'ipAddress': device_info.get('ipAddress', 'N/A'),
                 'model': device_info.get('model', 'N/A'),
                 'running_firmware': device_info.get('running_firmware', 'N/A'),
-                #'running_release_type': device_info.get('release_type', 'N/A'),
                 'latest_firmware': latest_version,
                 'desired_release_type': latest_firmware.get('release_type', 'N/A'),
                 'up_to_date': compare_versions(device_info.get('running_firmware', 'N/A'), latest_version) # Compare the running firmware with the latest shortName, return true if greater or equal.
@@ -173,5 +176,5 @@ def compare_firmware_versions(network_ids, org_id, product_families, desired_rel
     # Output the results as JSON
     return json.dumps(comparison_results, indent=4)
 
-# Call the function and print the comparison results
-print(compare_firmware_versions(network_ids, org_id, product_families, desired_release_type))
+# Call the function and print the comparison results for multiple org_ids
+print(compare_firmware_versions(network_id, org_ids, product_families, desired_release_type))
