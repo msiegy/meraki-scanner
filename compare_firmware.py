@@ -28,6 +28,7 @@ org_ids = ['your_org_id'] # Replace with your actual organization ID
 network_id = 'your_network_id'  # Replace with actual network ID. Only used to fetch latest firmware versions available.  
 product_families = ['switch', 'switchCatalyst']
 desired_release_type = 'stable'  # User-defined release type (e.g., 'stable', 'candidate', beta, etc.)
+output_file_path = 'comparison_results.json' # User-defined file path for result output.
 
 # Instantiate the Meraki dashboard API
 dashboard = meraki.DashboardAPI(API_KEY)
@@ -159,9 +160,10 @@ def get_current_firmware_versions(org_id, product_families):
     
     return device_info
 
-def compare_firmware_versions(network_id, org_ids, product_families, desired_release_type):
+def compare_firmware_versions(network_id, org_ids, product_families, desired_release_type, output_file: str = None):
     """
     Merge and compare the current runing firmware versions with the latest available firmware versions for the specified product families.
+    Optionally output the comparison results to a JSON file defined above as output_file_path.
     """
     comparison_results = {}
     
@@ -205,8 +207,11 @@ def compare_firmware_versions(network_id, org_ids, product_families, desired_rel
             }
     
     # Output the results as JSON
+    if output_file:
+        with open(output_file, 'w') as f:
+            json.dump(comparison_results, f, indent=4)
+    
     return json.dumps(comparison_results, indent=4)
 
 # Call the function and print the comparison results for multiple org_ids
-print(compare_firmware_versions(network_id, org_ids, product_families, desired_release_type))
-
+print(compare_firmware_versions(network_id, org_ids, product_families, desired_release_type, output_file=output_file_path))
